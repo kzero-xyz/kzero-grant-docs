@@ -147,5 +147,5 @@ This comprehensive analysis underscores the extensive work involved in evaluatin
 - Kzero Circuit: https://github.com/kzero-xyz/kzero-circuit
 - Snark: https://github.com/iden3/snarkjs
 - Standard rapidsnark: https://github.com/iden3/rapidsnark 
-- GPU-based rapidsnark: https://github.com/kzero-xyz/rapidsnark
+- GPU-based rapidsnark: https://github.com/kzero-xyz/rapidsnark-gpu
 - ICICLE Project Prerequisites: https://github.com/ingonyama-zk/icicle?tab=readme-ov-file#prerequisites
