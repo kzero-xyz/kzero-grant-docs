@@ -123,7 +123,7 @@ The witness is computed rapidly, benefiting from native execution speeds.
 3. Proof Generation Using GPU rapidsnark:
 The use of a GPU significantly reduces proof generation time, as demonstrated by our benchmarks.
 
-![image](https://hackmd.io/_uploads/SkEeaw-pJx.png)
+![pipeline](./assets/pipeline.png)
 
 ## Performance Comparison Table
 
