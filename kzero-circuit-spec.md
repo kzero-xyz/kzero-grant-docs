@@ -54,7 +54,7 @@ Used to generate the user's on-chain address, which is derived from the hash of 
 ## How it works?
 In rough sketches, the Kzro protocol relies on the following:
 
-![image](https://hackmd.io/_uploads/B1pyHsBhkl.png)
+![workflow](./assets/workflow.png)
 
 - A JWT is a signed payload from OAuth providers, including a user-defined field named nonce. Kzero leverages the OpenID Connect OAuth flow by defining the nonce as a public key, an expiry epoch and a randomness.
 - The User locally generate an ephemeral keyPair, where the ephemeral public key is defined in the nonce. The ephemeral private key signs transactions for a brief session, eliminating the need for user memorization. The Groth16 zero-knowledge proof is generated based on the JWT, concealing privacy-sensitive fields.
@@ -65,14 +65,14 @@ In rough sketches, the Kzro protocol relies on the following:
 ## Identity Authentication
 
 ### User Social Account <==> OAuth2 Provider
-![image](https://hackmd.io/_uploads/rk7P-oInyg.png)
+![workflow](./assets/login-flow.png)
 Users authenticate through an OAuth2 provider (Google is used as an example in this Spec). After logging in via Google, the user receives a JWT (JSON Web Token) signed by Google. But how is this JWT used in the subsequent process to verify the user’s identity?
 
 To address this, let's introduce a custom field in JWT: `nonce`.
 
 The nonce is defined as the hash of the ephemeral public key, an expiry time, and a randomness value. Before filling in the nonce field, the user must locally generate an ephemeral key and then hash: its public key, the public key’s expiry time, and a randomness value chosen by the user.
 
-![image](https://hackmd.io/_uploads/Hkg-W8jIhkl.png)
+![JWT](./assets/jwt.png)
 
 
 This randomness is known only to the user, making it impossible for anyone to reverse-engineer the user's public key through hash collisions. Even Google cannot establish a link between the ephemeral public key and the user's Google account, as Google is unaware of the actual ephemeral public key.
@@ -96,7 +96,7 @@ The next question is: which on-chain account does this ephemeral key control? Le
 ### User Social Account  <==> On-chain Address
 
 
-![image](https://hackmd.io/_uploads/Sk11yl_2ye.png)
+![address seed](./assets/address_seed.png)
 
 Within the zero-knowledge proof circuit, we compute the address seed, which is derived by hashing the `kc_name`, `kc_value_F`, `aud_value_F`(from the JWT), and `hashed_salt`(provided by the user, enables the management of multiple on-chain accounts linked to the same social account.) . 
 
