@@ -133,9 +133,6 @@ pub fn submit_zklogin_unsigned(
 ) -> DispatchResultWithPostInfo
 ```
 
-**Workflow**:
-![submit_zklogin_unsigned](./assets/submit_zklogin_unsigned.png)
-
 
 ### 3. `submit_jwks_unsigned`
 **Purpose**: Updates JWK (JSON Web Key) sets from OAuth providers via offchain worker
@@ -238,7 +235,7 @@ Supported providers and their JWK endpoints:
 
 **What it tests**:
 - Test externalities are properly set up
-- ZkLogin address has expected initial balance (1000)
+- ZkLogin address has expected initial balance
 - Storage items are initialized with default values
 - Pallet can be accessed and queried
 
@@ -255,7 +252,7 @@ Supported providers and their JWK endpoints:
 **Test Scope**: ZK proof verification, JWK validation, transaction validity
 
 **What it tests**:
-- ZK proof generation and validation
+- ZK proof validation
 - JWK retrieval from storage
 - Ephemeral key signature verification
 - Transaction source validation
