@@ -14,7 +14,45 @@ The runtime integrates a custom `pallet-zklogin` that enables:
 - **Ephemeral key verification** for secure transaction signing
 - **Multi-provider support** including Google, Facebook, Twitch, Kakao, Apple, Slack, and GitHub
 
+
 ![workflow](./assets/login-flow.png)
+> Remember fot the Inner Transaction we need to use InnerSignedExtra, which doesn't contain the `checkWeight` 
+**Implementation**:
+```rust
+    // For the inner transaction, we avoid the checkWeight, only do the charge
+    // When create the innerSignedPayload, we use the innerSignedExtra(which use the chargeTransactionPayment only)
+    pub type InnerSignedExtra = (
+        frame_system::CheckNonZeroSender<Runtime>,
+        frame_system::CheckSpecVersion<Runtime>,
+        frame_system::CheckTxVersion<Runtime>,
+        frame_system::CheckGenesis<Runtime>,
+        frame_system::CheckEra<Runtime>,
+        frame_system::CheckNonce<Runtime>,
+        // avoid using CheckWeight in the inner part
+        pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+    );
+
+    // ... construct the InnerUncheckedExtrinsic
+    let uxt = InnerUncheckedExtrinsic::new_signed(
+        call.clone(),
+        AccountId::from(signing_key.public()).into(),
+        MultiSignature::from(inner_sign),
+        inner_extra,
+    );
+
+    let zklogin_call = pallet_zklogin::Call::submit_zklogin_unsigned {
+        uxt: Box::new(uxt),
+        address_seed: address_seed.into(),
+        zk_material,
+    };
+
+    let outer_uxt = UncheckedExtrinsic::<
+        MultiAddress<AccountId, ()>,
+        RuntimeCall,
+        MultiSignature,
+        SignedExtra,
+    >::new_unsigned(zklogin_call.clone().into());
+```
 
 ### 2. Account Recovery Mechanisms
 
@@ -37,7 +75,7 @@ The runtime implements two complementary account recovery models:
 - Governance participation through proxies
 - Immediate access transfer
 
-**Implementation in Tests**:
+**Implementation**:
 ```rust
 // Add proxy delegation
 let proxy_call = pallet_proxy::Call::add_proxy {
@@ -75,7 +113,7 @@ let proxy_call = pallet_proxy::Call::proxy {
 4. **Claiming**: Rescuer claims recovery after delay period
 5. **Execution**: Rescuer can execute calls on behalf of recovered account
 
-**Implementation in Tests**:
+**Implementation**:
 ```rust
 // Create recovery configuration
 let create_recovery_call = pallet_recovery::Call::create_recovery {
