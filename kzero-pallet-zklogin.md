@@ -497,34 +497,7 @@ test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 
 ## Benchmark
 ### Benchmark Functions
-#### 1. `submit_zklogin_unsigned`
-**Purpose**: Measures performance of ZkLogin unsigned transaction submission
-
-**Scope**: ZK proof verification, transaction execution, storage operations
-
-**Setup Process**:
-- Creates test ZK material with predefined cryptographic data
-- Generates ephemeral key pair and signature
-- Sets up account balances for gas payment
-- Constructs system remark call as test transaction
-- Prepares unchecked extrinsic with proper signed extras
-
-**Key Measurements**:
-- ZK proof verification time
-- Transaction validation overhead
-- Storage read/write operations
-- Event emission cost
-- Executive transaction execution time
-
-**Complexity Factors**:
-- ZK proof size and verification complexity
-- Transaction payload size
-- Storage access patterns
-- Cryptographic operation costs
-
----
-
-#### 2. `submit_jwks_unsigned`
+#### 1. `submit_jwks_unsigned`
 **Purpose**: Measures performance of JWK batch submission by offchain worker
 
 **Scope**: Batch JWK processing, signature verification, storage updates
@@ -551,7 +524,7 @@ test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 
 ---
 
-#### 3. `update_keys`
+#### 2. `update_keys`
 **Purpose**: Measures performance of authorized key management operations
 
 **Scope**: Key addition/removal, storage updates, access control
@@ -577,7 +550,7 @@ test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 ---
 
 
-#### 4. `set_jwk`
+#### 3. `set_jwk`
 **Purpose**: Measures performance of manual JWK setting by root
 
 **Scope**: JWK parsing, storage insertion, access control
