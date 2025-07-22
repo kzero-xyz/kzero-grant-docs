@@ -2,20 +2,24 @@
 
 ## Overview
 
-The `primitive/zklogin` module is a core cryptographic primitive that enables zero-knowledge login functionality in the zkLogin process. It provides the foundational infrastructure for secure, privacy-preserving authentication using zero-knowledge proofs and JSON Web Keys (JWKs).
+The `primitive/zklogin` crate provides the **core cryptographic logic, data structures, and trait interfaces** for zkLogin authentication in the KZero ecosystem. It is designed to be a reusable, no-std compatible Rust library, focused on:
+- Zero-knowledge proof (ZKP) verification (Groth16, BN254)
+- Poseidon hash implementation for ZK circuits
+- JWK (JSON Web Key) parsing and provider abstraction
+- Typed data structures for ZKLogin flows
+- Security-critical input validation and error handling
 
 ## Core Components
 
 ### 1. ZkLogin Material (`ZkMaterial`)
 
-The `ZkMaterial` is the main data structure that encapsulates all necessary information for zkLogin verification:
-
+`ZkMaterialV1<Moment>` encapsulates all cryptographic and session data required for a zkLogin authentication:
 ```rust
 pub struct ZkMaterialV1<Moment> {
-    provider: JwkProvider,        // OAuth provider (Google, GitHub, etc.)
-    kid: Kid,                     // Key ID for JWK lookup
-    inputs: ZkLoginInputs,        // Zero-knowledge proof inputs
-    ephkey_expire_at: Moment,     // Ephemeral key expiration time
+    pub provider: JwkProvider,        // OAuth provider (Google, GitHub, etc.)
+    pub kid: Kid,                     // Key ID for JWK lookup
+    pub inputs: ZkLoginInputs,        // ZK proof public inputs
+    pub ephkey_expire_at: Moment,     // Ephemeral key expiration (block or timestamp)
 }
 ```
 
@@ -43,15 +47,16 @@ pub enum JwkProvider {
 
 ### 3. Zero-Knowledge Proof System
 
-The ZK proof system uses Groth16 protocol with BN254 curve:
-
+Implements Groth16 proof verification over the BN254 curve, with strict type safety:
 ```rust
 pub struct ZkLoginProof {
-    a: CircomG1,    // G1 group element A
-    b: CircomG2,    // G2 group element B  
-    c: CircomG1,    // G1 group element C
+    pub a: CircomG1,
+    pub b: CircomG2,
+    pub c: CircomG1,
 }
 ```
+- **All group elements are validated for curve membership.**
+- **Proofs are checked against public inputs derived from 'ZkLogin Material' and 'JWK'.**
 
 
 ### 4. Poseidon Hash Function
@@ -61,6 +66,15 @@ The module implements Poseidon hash for efficient zero-knowledge proof generatio
 ```rust
 pub fn poseidon_zk_login(inputs: Vec<Fr>) -> Result<Bn254Fr, ZkAuthError>
 ```
+- **Supports variable-length input vectors.**
+- **Used for hashing 'ZkLogin Material' and public inputs.**
+
+### 5. Trait Interfaces & Type Conversions
+
+- **Trait-based design** for extensibility (e.g., `TryIntoEphPubKey`, `ReplaceSender`).
+- **Type conversions** for AccountId, MultiAddress, etc., to support flexible integration with different runtimes or applications.
+
+---
 
 ## Main Methods and Logic
 
@@ -72,7 +86,13 @@ pub fn verify_zk_login(
     eph_pubkey: EphPubKey,
     address_seed: &AccountId32,
     jwk: &Jwk,
-) -> ZkAuthResult<()>
+) -> ZkAuthResult<()> {
+    // 1. Extract modulus from JWK
+    // 2. Hash all public inputs (address_seed, eph_pubkey, modulus, etc.)
+    // 3. Prepare Groth16 public inputs
+    // 4. Verify Groth16 proof (BN254)
+    // 5. Return Ok or detailed error
+}
 ```
 
 **Verification Flow:**
@@ -95,6 +115,9 @@ pub fn fetch_jwks<E>(
     fetcher: impl Fn(&str) -> Result<serde_json::Value, E>,
 ) -> Result<Vec<Jwk>, JwkProviderErr<E>>
 ```
+- **OAuth 2.0 discovery protocol**: Fetches provider config, extracts `jwks_uri`, fetches and parses JWKs.
+- **Flexible fetcher**: Accepts any HTTP client or mock for testing.
+- **Strict JSON schema validation** for JWKs.
 
 **Method Description**
 
@@ -132,6 +155,8 @@ pub fn calculate_all_inputs_hash(
     max_epoch: u64,
 ) -> Result<Bn254Fr, ZkAuthError>
 ```
+- **Used to hash all cryptographic inputs for ZK circuit public input.**
+- **Handles edge cases and input validation.**
 
 ![poseidon_hash](./assets/poseidon_hash.png)
 

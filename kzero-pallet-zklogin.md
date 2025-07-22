@@ -1,19 +1,4 @@
 # Pallet ZkLogin: What & Why pallet-zklogin?
-
-## Table of Contents
-1. [Overview](#overview)
-2. [Architecture](#architecture)
-4. [Core Components](#core-components)
-5. [Key Methods & Functions](#key-methods--functions)
-6. [Configuration & Setup](#configuration--setup)
-7. [Testing](#testing)
-8. [Running Tests](#running-tests)
-9. [Benchmark](#benchmark)
-10.[Running Benchmark](#running-benchmark)
-11. [Security Considerations](#security-considerations)
-12. [Conclusion](#conclusion)
----
-
 ## Overview
 
 Pallet ZkLogin is a Substrate-based blockchain pallet that enables Web3 applications to authenticate users using traditional OAuth providers (Google, Facebook, Apple, etc.) through zero-knowledge proof verification. This eliminates the need for users to manage private keys while maintaining blockchain security and privacy.
@@ -24,7 +9,7 @@ Pallet ZkLogin is a Substrate-based blockchain pallet that enables Web3 applicat
 - **Offchain Worker**: Automated JWK (JSON Web Key) management
 - **Ephemeral Key Management**: Time-based key expiration for enhanced security
 - **On-chain Verification**: ZK proofs are verified directly on the blockchain
-- **Flexible Transaction Support**: Enables individualized transactions for various use cases
+- **Flexible Transaction Support**: Enables individualized transactions for various use cases, in the test, we use the `pallet-proxy` & `pallet-recovery` to implement the 'Proxy-based Recovery' and 'Social Recovery' for zkLogin Account.
 ---
 
 ## Architecture
@@ -105,6 +90,7 @@ pub enum Error<T> {
 ### 1. `validate_unsigned`
 **Purpose**: Validates the validity of unsigned transactions to ensure only legitimate ZkLogin transactions can enter the transaction pool
 
+> The `validate_unsigned` function is mainly being used in the context of the transaction pool to check the validity of the call wrapped by an unsigned extrinsic.
 ```rust
 fn validate_unsigned(source: TransactionSource, call: &Self::Call) -> TransactionValidity
 ```
@@ -114,15 +100,36 @@ fn validate_unsigned(source: TransactionSource, call: &Self::Call) -> Transactio
 2. Retrieves JWK from storage
 3. Verifies ZK proof using JWK
 4. Checks transaction validity
-> The `validate_unsigned` function is mainly being used in the context of the transaction pool to check the validity of the call wrapped by an unsigned extrinsic.
+
+> 📌 **Notes**: When dealing with `submit_zklogin_unsigned` transactions, we need to rollback every status changes. Because the `validate_unsigned` should only do the check work, not do any thing related to the chain storage/status.
+```rust
+ #[pallet::validate_unsigned]
+    // ...
+    fn validate_unsigned(source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+
+    // verify signature
+    match call {
+        Call::submit_zklogin_unsigned { ... } => {
+         // ...
+            let r = with_transaction::<TransactionValidity, DispatchError, _>(|| {
+                let result = xt.validate::<T::UnsignedValidator>(source, &dispatch_info, encoded_len);
+                
+                // must rollback for any case
+                TransactionOutcome::Rollback(Ok(result))
+            });
+            // discard this part
+            r.unwrap()
+        }
+        Call::submit_jwks_unsigned { ... } => { ... } 
+    // ...
+    }
+```
 
 
 ### 2. `submit_zklogin_unsigned`
 **Purpose**: Main entry point for ZkLogin transactions
 
 **Trigger Condition**: When `validate_unsigned` passes, the transaction is included in a block
-
-**Execution Location**: During block execution phase
 
 ```rust
 pub fn submit_zklogin_unsigned(
@@ -197,21 +204,40 @@ pub fn set_jwk(
 ## Configuration & Setup
 
 ### Runtime Configuration
+- **InnerSignedExtra** : Similar to `SignedExtra`, but it is used for constructing the inner calls(e.g. `pallet_balances::Call::transfer_keep_alive`, `pallet_recovery::Call::create_recovery`, ...), `InnerSignedExtra` should be used for the inner call, which doesn't contains the `CheckWeight`.
+
 ```rust
+// For the inner transaction, we avoid the checkWeight, only do the charge
+// When create the innerSignedPayload, we use the innerSignedExtra(which use the chargeTransactionPayment only)
+pub type InnerSignedExtra = (
+    frame_system::CheckNonZeroSender<Runtime>,
+    frame_system::CheckSpecVersion<Runtime>,
+    frame_system::CheckTxVersion<Runtime>,
+    frame_system::CheckGenesis<Runtime>,
+    frame_system::CheckEra<Runtime>,
+    frame_system::CheckNonce<Runtime>,
+    pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+);
+
+pub type InnerUncheckedExtrinsic = 
+    generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, InnerSignedExtra>;
+
+// for inner transaction, we use the innerSignedPayload(which use the innerSignedExtra)
+pub type InnerSignedPayload = generic::SignedPayload<RuntimeCall, InnerSignedExtra>;
+
 impl pallet_zklogin::Config for Runtime {
     type AuthorityId = pallet_zklogin::crypto::ZkLoginAuthId;
+    type MaxKeys = MaxKeys;
     type RuntimeEvent = RuntimeEvent;
-    type Context = ();
-    type Extrinsic = UncheckedExtrinsic;
-    type CheckedExtrinsic = CheckedExtrinsic;
-    type UnsignedValidator = Pallet<Runtime>;
+    type Extrinsic = InnerUncheckedExtrinsic;
+    type CheckedExtrinsic =
+        <InnerUncheckedExtrinsic as sp_runtime::traits::Checkable<Self::Context>>::Checked;
+    type UnsignedValidator = Runtime;
+    type Context = frame_system::ChainContext<Runtime>;
     type Time = Timestamp;
-    type MaxKeys = ConstU32<3>;
     type WeightInfo = pallet_zklogin::weights::SubstrateWeight<Runtime>;
 }
 ```
-
-
 
 ### OAuth Provider Configuration
 Supported providers and their JWK endpoints:
@@ -223,277 +249,132 @@ Supported providers and their JWK endpoints:
 - **Slack**: `https://slack.com/.well-known/openid-configuration`
 - **GitHub**: `https://token.actions.githubusercontent.com/.well-known/openid-configuration`
 
+### Recovery Features
+
+The zklogin pallet supports account recovery via two models: **Proxy-based Recovery** and **Social Recovery**. To enable these features, you need to include both `pallet-proxy` and `pallet-recovery` in your runtime.
+
+#### Integration Steps
+1. **Add Dependencies**
+   - Ensure your runtime includes `pallet-proxy` and `pallet-recovery`:
+     ```rust
+     construct_runtime!(
+         pub enum Runtime {
+             // ...
+             Proxy: pallet_proxy::{Pallet, Call, Storage, Event<T>},
+             Recovery: pallet_recovery::{Pallet, Call, Storage, Event<T>},
+             ZkLogin: pallet_zklogin::{Pallet, Call, Event<T>, ValidateUnsigned},
+             // ...
+         }
+     );
+     ```
+2. **Configure the Pallets**
+   - Implement the required `Config` traits for both pallets in your runtime, e.g.:
+     ```rust
+     impl pallet_proxy::Config for Runtime { /* ... */ }
+     impl pallet_recovery::Config for Runtime { /* ... */ }
+     ```
+
+#### Recovery Models
+- **Proxy-based Recovery**: The zkLogin account adds a proxy (another account) that can act on its behalf. If the user loses access, the proxy can help recover control.
+- **Social Recovery**: The zkLogin account sets a group of trusted friends and a threshold. If the user loses access, a subset of friends (meeting the threshold) can vouch for recovery, and a rescuer can claim the account.
+
+#### Example: Social Recovery Flow
+1. **Create Recovery Config (as zkLogin user):**
+   ```rust
+   // zkLogin signs and submits:
+   pallet_recovery::Call::create_recovery {
+       friends: vec![friend1, friend2, friend3],
+       threshold: 2,
+       delay_period: 0,
+   }
+   // ...wrapped in zkLogin unsigned extrinsic
+   ```
+2. **Initiate Recovery (rescuer):**
+   ```rust
+   pallet_recovery::Call::initiate_recovery {
+       account: lost_account,
+   }
+   ```
+3. **Friends Vouch:**
+   ```rust
+   // Each friend signs and submits this call
+   pallet_recovery::Call::vouch_recovery {
+       lost: lost_account,
+       rescuer: rescuer_account,
+   }
+   ```
+4. **Claim Recovery (rescuer):**
+   ```rust
+   pallet_recovery::Call::claim_recovery {
+       account: lost_account,
+   }
+   ```
+5. **As Recovered (rescuer):**
+   ```rust
+   pallet_recovery::Call::as_recovered {
+       account: lost_account,
+       call: Box::new(pallet_balances::Call::transfer_keep_alive { dest, value }),
+   }
+   ```
+
+#### Example: Proxy-based Recovery
+1. **Add Proxy (as zkLogin user):**
+   ```rust
+   pallet_proxy::Call::add_proxy {
+       delegate: proxy_account,
+       proxy_type: (),
+       delay: 0,
+   }
+   // ...wrapped in zkLogin unsigned extrinsic
+   ```
+2. **Proxy Executes Recovery or Transfer:**
+   - The proxy can now submit transactions on behalf of the zkLogin account.
+
+> All these calls can be wrapped and submitted via zkLogin unsigned extrinsics, enabling seamless recovery flows for users authenticated via OAuth and ZK proofs.
+
 ---
 
 ## Testing
 
-### Key Unit Tests & Functions
-#### 1. `basic_setup_works`
-**Purpose**: Verifies basic pallet setup and account initialization
+### Test Coverage Overview
 
-**Test Scope**: Storage initialization, account balance setup
+The zklogin pallet includes a comprehensive suite of unit and integration tests, covering the following areas:
 
-**What it tests**:
-- Test externalities are properly set up
-- ZkLogin address has expected initial balance
-- Storage items are initialized with default values
-- Pallet can be accessed and queried
+- **Basic Initialization**
+  - `basic_setup_works`: Ensures the test environment and initial balances are set up correctly.
 
-**Key Assertions**:
-- System account balance matches expected value
-- Keys storage is empty initially
-- Jwks storage is empty initially
+- **ZKLogin Transaction Flow**
+  - `validate_unsigned_should_work`: Validates a successful zkLogin unsigned transaction, including proof verification, JWK setup, and balance transfer.
+  - `validate_unsigned_should_fail_when_jwk_not_match`: Ensures that transactions with mismatched JWKs are rejected.
+  - `test_submit_zklogin_unsigned`: Tests the full unsigned zkLogin transaction submission and execution.
 
----
+- **JWK and Key Management**
+  - `test_parse_jwk_success`, `test_parse_jwk_with_google_format`: Validate correct parsing of JWK JSON.
+  - `test_parse_jwk_missing_required_fields`: Ensures invalid or incomplete JWKs are rejected.
+  - `test_set_jwk`: Tests manual JWK setting, including root access control and error handling.
+  - `test_update_keys`: Verifies adding/removing authorized keys and root-only access.
+  - `test_submit_jwks_unsigned`: Tests offchain worker JWK batch submission and signature verification.
+  - `test_fetch_jwks`: Mocks HTTP to test offchain JWK fetching.
+  - `test_check_jwk_not_onchain_when_not_exists`, `test_check_jwk_not_onchain_when_same_content`, `test_check_jwk_not_onchain_when_different_content`: Test on-chain/off-chain JWK comparison logic.
 
-#### 2. `validate_unsigned_should_work`
-**Purpose**: Tests ZK proof validation in unsigned transaction processing
+- **Proxy and Recovery Flows**
+  - `validate_add_proxy_should_work`, `validate_proxy_call_should_work`, `validate_remove_proxy_should_work`: Test proxy addition, proxy call execution, and proxy removal via zkLogin.
+  - `validate_create_recovery_should_work`, `validate_complete_recovery_flow_should_work`: Test social recovery setup and the full recovery process, including friend vouching and fund recovery.
 
-**Test Scope**: ZK proof verification, JWK validation, transaction validity
+- **Weight Consistency**
+  - `should_weight_the_same`: Ensures that zkLogin-wrapped calls have the same weight as direct calls.
 
-**What it tests**:
-- ZK proof validation
-- JWK retrieval from storage
-- Ephemeral key signature verification
-- Transaction source validation
-- Address lookup functionality
-- Complete unsigned transaction flow
+### Running the Tests
 
-**Test Setup**:
-- Creates test ZK material with Google provider
-- Generates ephemeral key pair
-- Constructs balance transfer transaction
-- Inserts valid JWK into storage
-
-**Key Assertions**:
-- Validation returns `Ok(ValidTransaction)`
-- All cryptographic verifications pass
-- Transaction is marked as valid for inclusion
-
----
-
-#### 3. `validate_unsigned_should_fail_when_jwk_not_match`
-**Purpose**: Tests validation failure when JWK doesn't match expected format
-**Test Scope**: Error handling, invalid JWK scenarios
-
-**What it tests**:
-- JWK mismatch detection
-- Error propagation in validation
-
-**Test Setup**:
-- Uses different JWK than what ZK proof was generated with
-- Inserts mismatched JWK into storage
-- Attempts validation with incorrect material
-
-**Key Assertions**:
-- Validation returns `Err(InvalidTransaction)`
-- Proper error type is propagated
-
----
-
-#### 4. `test_parse_jwk_success`
-**Purpose**: Tests successful JWK parsing from JSON format
-
-**Test Scope**: JWK parsing, JSON deserialization
-
-**What it tests**:
-- JWK JSON parsing functionality
-- Required field extraction
-- Error handling for valid input
-- JWK structure validation
-
-**Test Data**:
-- Valid Google JWK JSON with all required fields
-- Proper RSA key structure
-- Correct key ID and algorithm specifications
-
-**Key Assertions**:
-- Parsing returns `Ok(Jwk)`
-- All required fields are correctly extracted
-- JWK structure matches expected format
-
----
-
-#### 5. `test_parse_jwk_missing_required_fields`
-**Purpose**: Tests JWK parsing failure when required fields are missing
-
-**Test Scope**: Error handling, invalid JSON format
-
-**What it tests**:
-- Missing required field detection
-- JSON validation error handling
-- Proper error type propagation
-- Invalid input rejection
-
-**Test Data**:
-- Invalid JWK JSON missing key fields (kid, alg, n, e)
-- Malformed JSON structure
-
-**Key Assertions**:
-- Parsing returns `Err(InvalidJwkJson)`
-- Correct error type is returned
-- Invalid input is properly rejected
-
----
-
-#### 6. `test_fetch_jwks`
-**Purpose**: Tests JWK fetching from OAuth providers(via mocking the HTTP)
-
-**Test Scope**: HTTP requests, provider integration
-
-**What it tests**:
-- JWK URI extraction and validation
-- JWK set parsing and deserialization
-- Multiple JWK handling
-- Error handling for network failures
-
-**Test Setup**:
-- Mocks HTTP responses for well-known and JWK endpoints
-- Tests Google provider integration
-- Simulates complete JWK fetching flow
-
-**Key Assertions**:
-- JWK fetching returns `Ok(Vec<Jwk>)`
-- Correct number of JWKs are parsed
-- Key IDs match expected values
-- Provider integration works correctly
-
----
-
-#### 7. `test_check_jwk_not_onchain`
-**Purpose**: Tests JWK comparison logic between offchain and onchain data
-
-**Test Scope**: Storage comparison, update detection
-
-**Test Scenarios**:
-- **JWK not exists**: Returns `Some(true)` - needs upload
-- **Same content**: Returns `Some(false)` - no update needed  
-- **Different content**: Returns `Some(true)` - needs update
-
-**What it tests**:
-- JWK existence checking
-- Content comparison logic
-- Update requirement detection
-- Storage state validation
-
-**Key Assertions**:
-- Correct update flags are returned
-- Content comparison works accurately
-- Storage state is properly evaluated
-
----
-
-#### 8. `test_set_jwk`
-**Purpose**: Tests manual JWK setting functionality
-
-**Test Scope**: Root access control, JWK insertion
-
-**What it tests**:
-- Root access control enforcement
-- JWK parsing and storage
-- Error handling for unauthorized access
-- Storage verification
-
-**Test Scenarios**:
-- **Root access**: Successfully sets JWK
-- **Non-root access**: Fails with authorization error
-- **Invalid JSON**: Fails with parsing error
-
-**Key Assertions**:
-- Root can successfully set JWK
-- Non-root access is properly rejected
-- JWK is correctly stored in storage
-- Events are properly emitted
-
----
-
-#### 9. `test_update_keys`
-**Purpose**: Tests authorized key management functionality
-
-**Test Scope**: Key addition/removal, storage updates
-
-**What it tests**:
-- Key addition functionality
-- Key removal functionality
-- Root access control
-- Storage state management
-- Event emission verification
-
-**Test Scenarios**:
-- **Add keys**: Successfully adds new authorized keys
-- **Remove keys**: Successfully removes existing keys
-- **Mixed operations**: Add and remove keys in same call
-- **Non-root access**: Fails with authorization error
-
-**Key Assertions**:
-- Keys are correctly added to storage
-- Keys are correctly removed from storage
-- Storage state is properly updated
-- Events contain correct key information
-- Root access control is enforced
-
----
-
-#### 10. `test_submit_jwks_unsigned`
-**Purpose**: Tests offchain worker JWK submission
-
-**Test Scope**: Unsigned transaction processing, signature verification
-
-**What it tests**:
-- Unsigned transaction validation
-- Authorized key signature verification
-- JWK batch insertion
-- Event emission
-
-**Test Setup**:
-- Creates authorized key pair
-- Generates signed payload with JWK data
-- Submits unsigned transaction with signature
-
-**Key Assertions**:
-- Transaction is accepted with valid signature
-- JWKs are correctly stored in batch
-- Events are properly emitted
-- Invalid signatures are rejected
-
----
-
-## Running Tests
+To run all tests:
 ```bash
-# Run all tests
 cd frame/zklogin
-
 cargo test
-
-# Run specific test
-cargo test validate_unsigned_should_work
-```
-After successfully running the test, you should get the following result:
-```bash
-running 16 tests
-test tests::test_parse_jwk_missing_required_fields ... ok
-test tests::test_check_jwk_not_onchain_when_different_content ... ok
-test tests::test_check_jwk_not_onchain_when_not_exists ... ok
-test tests::test_check_jwk_not_onchain_when_same_content ... ok
-test tests::test_parse_jwk_success ... ok
-test tests::test_parse_jwk_with_google_format ... ok
-test tests::__construct_runtime_integrity_test::runtime_integrity_tests ... ok
-test tests::test_genesis_config_builds ... ok
-test tests::test_fetch_jwks ... ok
-test tests::test_update_keys ... ok
-test tests::test_submit_jwks_unsigned ... ok
-test tests::test_set_jwk ... ok
-test tests::validate_unsigned_should_fail_when_jwk_not_match ... ok
-test tests::basic_setup_works ... ok
-test tests::test_submit_zklogin_unsigned ... ok
-test tests::validate_unsigned_should_work ... ok
-
-test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.16s
-
-   Doc-tests pallet_zklogin
 ```
 
+All tests should pass, covering the full zkLogin, JWK, proxy, and recovery flows, as well as error and edge cases.
 
+---
 
 ## Benchmark
 ### Benchmark Functions
