@@ -17,30 +17,6 @@ The runtime integrates a custom `pallet-zklogin` that enables:
 - **Multi-provider support** including Google, Facebook, Twitch, Kakao, Apple, Slack, and GitHub
 
 ![workflow](./assets/login-flow.png)
-> Remember fot the Inner Transaction we need to use InnerSignedExtra, which doesn't contain the `checkWeight` 
-**Implementation**:
-```rust
-    // For the inner transaction, we avoid the checkWeight, only do the charge
-    // When create the innerSignedPayload, we use the innerSignedExtra(which use the chargeTransactionPayment only)
-    pub type InnerSignedExtra = (
-        frame_system::CheckNonZeroSender<Runtime>,
-        frame_system::CheckSpecVersion<Runtime>,
-        frame_system::CheckTxVersion<Runtime>,
-        frame_system::CheckGenesis<Runtime>,
-        frame_system::CheckEra<Runtime>,
-        frame_system::CheckNonce<Runtime>,
-        // avoid using CheckWeight in the inner part
-        pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
-    );
-
-    // ... construct the InnerUncheckedExtrinsic
-    let uxt = InnerUncheckedExtrinsic::new_signed(
-        call.clone(),
-        AccountId::from(signing_key.public()).into(),
-        MultiSignature::from(inner_sign),
-        inner_extra,
-    );
-```
 
 ### 2. Account Recovery Mechanisms
 
@@ -154,20 +130,25 @@ let as_recovered_call = pallet_recovery::Call::as_recovered {
   pub use pallet_zklogin;
   use pallet_zklogin::Call as ZkLoginCall;
   ```
-- Add the pallet to `construct_runtime!`:
+- Ensure `pallet-zklogin` is included in your `construct_runtime!`: 
   ```rust
   construct_runtime!(
-      ...
-      ZkLogin: pallet_zklogin,
-      ...
+    ...
+    ZkLogin: pallet_zklogin::{Pallet, Call, Storage, Event<T>},
+    ...
   );
   ```
 
 ### Runtime Configuration
 
+**📌Notice**
+- You must create a new transaction type (referred to in this document as `InnerSignedExtra`). 
+- In this new transaction type, you must carefully review the implementation of it. The implementation of `InnerSignedExtra` must not include any unsigned pre-dispatch logic, such as `checkWeight`. Other checks can remain consistent with the `SignedExtra` part in your runtime.
+
+
 Implement the `pallet_zklogin::Config` trait for your runtime:
 ```rust
-// For the inner transaction, we avoid the checkWeight, only do the charge
+// For the inner transaction, we avoid the checkWeight
 // When create the innerSignedPayload, we use the innerSignedExtra(which use the chargeTransactionPayment only)
 pub type InnerSignedExtra = (
     frame_system::CheckNonZeroSender<Runtime>,
@@ -176,6 +157,7 @@ pub type InnerSignedExtra = (
     frame_system::CheckGenesis<Runtime>,
     frame_system::CheckEra<Runtime>,
     frame_system::CheckNonce<Runtime>,
+    // avoid using CheckWeight in the inner part
     pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
 );
 
@@ -197,87 +179,17 @@ impl pallet_zklogin::Config for Runtime {
     type WeightInfo = pallet_zklogin::weights::SubstrateWeight<Runtime>;
 }
 ```
-- **Note**: You may need to define `InnerUncheckedExtrinsic` and `InnerSignedExtra` as shown in the runtime example, to support inner transactions without `CheckWeight`.
-- Configure any constants (e.g., max keys, deposit amounts) as needed for your chain.
-
-### Exposing zkLogin Calls
-
-- Ensure `pallet-zklogin` calls (e.g., `submit_zklogin_unsigned`, `set_jwk`) are exposed in your runtime API.
-- You may want to add custom RPCs or offchain workers for JWK management.
-- Example call exposure:
-  ```rust
-  // In construct_runtime!
-  ZkLogin: pallet_zklogin::{Pallet, Call, Storage, Event<T>},
-  ```
-
-
----
 
 **For more details, see the pallet and primitive documentation, and refer to the test suite for integration examples.**
 
 
-## Runtime Configuration For Recovery(`pallet-proxy` & `pallet-recovery`)
+## 🚀 Integrate Recovery Mechnism for zkLogin Account
 
-### Core Parameters
-- You may want to add custom config, like 'RecoveryDeposit', 'MaxFriends' and other parameters.
-```rust
-// Block time configuration
-pub const MILLISECS_PER_BLOCK: u64 = 6000;
-pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
+**zkLogin Account supports recovery functionality** : The zklogin pallet supports account recovery via two models: **Proxy-based Recovery** and **Social Recovery**. 
+> To enable these features, you need to include both `pallet-proxy` and `pallet-recovery` in your runtime.
 
-// Economic parameters
-pub const EXISTENTIAL_DEPOSIT: u128 = 500;
-pub const DOLLARS: Balance = 100 * CENTS;
-pub const CENTS: Balance = 1_000 * MILLICENTS;
-pub const MILLICENTS: Balance = 1_000_000_000;
-
-// Recovery parameters
-pub const ConfigDepositBase: Balance = 5 * DOLLARS;
-pub const FriendDepositFactor: Balance = 50 * CENTS;
-pub const MaxFriends: u32 = 9;
-pub const RecoveryDeposit: Balance = 5 * DOLLARS;
-
-// Proxy parameters
-pub const ProxyDepositBase: Balance = 100 * MILLICENTS;
-pub const ProxyDepositFactor: Balance = 5 * MILLICENTS;
-pub const MaxProxies: u32 = 32;
-```
-
-#### Recovery Configuration
-```rust
-impl pallet_recovery::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
-    type WeightInfo = pallet_recovery::weights::SubstrateWeight<Runtime>;
-    type RuntimeCall = RuntimeCall;
-    type Currency = Balances;
-    type ConfigDepositBase = ConfigDepositBase;
-    type FriendDepositFactor = FriendDepositFactor;
-    type MaxFriends = MaxFriends;
-    type RecoveryDeposit = RecoveryDeposit;
-}
-```
-
-#### Proxy Configuration
-```rust
-impl pallet_proxy::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
-    type RuntimeCall = RuntimeCall;
-    type Currency = Balances;
-    type ProxyType = ProxyType;
-    type ProxyDepositBase = ProxyDepositBase;
-    type ProxyDepositFactor = ProxyDepositFactor;
-    type MaxProxies = ConstU32<32>;
-    type WeightInfo = pallet_proxy::weights::SubstrateWeight<Runtime>;
-    type MaxPending = ConstU32<32>;
-    type CallHasher = BlakeTwo256;
-    type AnnouncementDepositBase = AnnouncementDepositBase;
-    type AnnouncementDepositFactor = AnnouncementDepositFactor;
-}
-```
-#### Exposing Recovery Calls
-
-- Ensure `pallet-proxy`/`pallet-recovery` calls are exposed in your runtime API.
-- Example call exposure:
+### Include Recovery pallet in your runtime
+- Ensure `pallet-proxy`/`pallet-recovery` are included.
   ```rust
   // In construct_runtime!
     Proxy: pallet_proxy::{Pallet, Call, Storage, Event<T>},
@@ -295,7 +207,7 @@ let call: RuntimeCall = BalancesCall::transfer_keep_alive { dest: MultiAddress::
 // ...
 let inner_extra: InnerSignedExtra = ...;
 
-let uxt = InnerMockUncheckedExtrinsic::new_signed(
+let uxt = InnerUncheckedExtrinsic::new_signed(
     call,
     AccountId::from(signing_key).into(),
     MultiSignature::from(inner_sign),
