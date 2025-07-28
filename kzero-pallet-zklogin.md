@@ -368,8 +368,7 @@ The zklogin pallet includes a comprehensive suite of unit and integration tests,
 
 To run all tests:
 ```bash
-cd frame/zklogin
-cargo test
+cargo test -p pallet-zklogin
 ```
 
 All tests should pass, covering the full zkLogin, JWK, proxy, and recovery flows, as well as error and edge cases.

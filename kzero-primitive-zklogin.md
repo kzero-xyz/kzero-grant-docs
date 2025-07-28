@@ -161,7 +161,16 @@ pub fn calculate_all_inputs_hash(
 ![poseidon_hash](./assets/poseidon_hash.png)
 
 
-## Testing Strategy
+## Testing 
+
+### Running the Tests
+
+To run all tests:
+```bash
+cargo test -p primitive-zklogin --features testing
+```
+
+All tests should pass, covering the full zkLogin, JWK, proxy, and recovery flows, as well as error and edge cases. 
 
 ### 1. Affine Point Validation Tests
 
