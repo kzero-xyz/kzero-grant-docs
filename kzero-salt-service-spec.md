@@ -60,10 +60,10 @@ c. **Salt Return Phase**
 Todo: This will be changed to online docker
 ```bash
 # Build Docker image
-docker build -t test-enclave:latest .
+docker pull kzeroxyz/kzero-salt-enclave-service:v0.1.0
 
 # Run container (simulation mode)
-docker run -d -p 8080:8080 --name test-enclave-new -e SGX_MODE=SIM test-enclave:latest
+docker run -d -p 8080:8080 --name test-enclave-new -e SGX_MODE=SIM kzeroxyz/kzero-salt-enclave-service:v0.1.0
 ```
 
 ## 4. Intel SGX Enclave Technology Deep Dive
