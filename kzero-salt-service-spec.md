@@ -71,7 +71,6 @@ docker run -d -p 8080:8080 --name test-enclave-new -e SGX_MODE=SIM kzeroxyz/kzer
 docker run --rm --name test-enclave-test -e SGX_MODE=SIM kzeroxyz/kzero-salt-enclave-service:v0.1.1 ./bin/app --test
 ```
 
-
 ## 4. Intel SGX Enclave Technology Deep Dive
 
 ### 4.1 What is SGX Enclave
