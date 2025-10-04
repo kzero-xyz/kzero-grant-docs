@@ -164,13 +164,19 @@ The service will start on port 8080 and display startup messages.
 > **Note:** Build time depends on your machine's performance. For reference, on a 4-CPU Intel(R) Xeon(R) CPU E5-2680 v2 @ 2.80GHz (CPU MHz: 2792.998), the build process takes approximately 50 minutes.
 
 ```bash
-docker pull kzeroxyz/kzero-salt-enclave-service:v0.1.0
+docker pull kzeroxyz/kzero-salt-enclave-service:v0.1.1
 ```
 
 ### Step 2: Run the Container
 
 ```bash
-docker run -d -p 8080:8080 --name test-enclave-new -e SGX_MODE=SIM kzeroxyz/kzero-salt-enclave-service:v0.1.0
+docker run -d -p 8080:8080 --name test-enclave-new -e SGX_MODE=SIM kzeroxyz/kzero-salt-enclave-service:v0.1.1
+```
+
+### Test
+
+```bash
+docker run --rm --name test-enclave-test -e SGX_MODE=SIM kzeroxyz/kzero-salt-enclave-service:v0.1.1 ./bin/app --test
 ```
 
 ## 5. API Usage & Testing(Same for HW/SIM Mode)
