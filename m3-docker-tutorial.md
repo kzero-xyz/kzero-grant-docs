@@ -164,21 +164,35 @@ The service will start on port 8080 and display startup messages.
 > **Note:** Build time depends on your machine's performance. For reference, on a 4-CPU Intel(R) Xeon(R) CPU E5-2680 v2 @ 2.80GHz (CPU MHz: 2792.998), the build process takes approximately 50 minutes.
 
 ```bash
-docker pull kzeroxyz/kzero-salt-enclave-service:v0.1.1
+docker pull kzeroxyz/kzero-salt-enclave-service:v0.1.2
 ```
 
 ### Step 2: Run the Container
 
 ```bash
-docker run -d -p 8080:8080 --name test-enclave-new -e SGX_MODE=SIM kzeroxyz/kzero-salt-enclave-service:v0.1.1
+docker run -d -p 8080:8080 --name test-enclave-new -e SGX_MODE=SIM kzeroxyz/kzero-salt-enclave-service:v0.1.2
 ```
 
 ### Test
 
 ```bash
-docker run --rm --name test-enclave-test -e SGX_MODE=SIM kzeroxyz/kzero-salt-enclave-service:v0.1.1 ./bin/app --test
+docker run --rm --name test-enclave-test -e SGX_MODE=SIM kzeroxyz/kzero-salt-enclave-service:v0.1.2 make test-app
 ```
 
+### Test Coverage
+```bash
+docker run --rm --name test-enclave-test -e SGX_MODE=SIM kzeroxyz/kzero-salt-enclave-service:v0.1.2 make test-coverage-app
+```
+
+You should see the following coverage report:
+```bash
+=== Test Results ===
+All tests PASSED!
+=== Test Suite Complete ===
+Generating coverage report...
+File 'App/App.cpp'
+Lines executed:93.49% of 568
+```
 ## 5. API Usage & Testing(Same for HW/SIM Mode)
 
 ### POST /get_salt
@@ -203,7 +217,9 @@ curl -X POST -H "Content-Type: application/json" \
 ### Example with Google OAuth JWT
 
 ```bash
-curl -X POST http://localhost:8080/get_salt   -H "Content-Type: application/json"   -d '{"message": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjJkN2VkMzM4YzBmMTQ1N2IyMTRhMjc0YjVlMGU2NjdiNDRhNDJkZGUiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI1NjA2MjkzNjU1MTctbXQ5ajlhcmZsY2dpMzVpOGhwb3B0cjY2cWdvMWxtZm0uYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI1NjA2MjkzNjU1MTctbXQ5ajlhcmZsY2dpMzVpOGhwb3B0cjY2cWdvMWxtZm0uYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDI2ODcyOTA4OTIwOTUyNDQwNTciLCJub25jZSI6IkhTcXdzb3k4a1Nwb3Q5LWNrRVVGUGItTGRHMCIsIm5iZiI6MTc1NzA3NjE2NiwiaWF0IjoxNzU3MDc2NDY2LCJleHAiOjE3NTcwODAwNjYsImp0aSI6ImNjZjgyM2FkYjlmNjBjMGFjZDNiNmFlMmFmZWQxMjkwNGRmNTdkZjMifQ.deCKin6mHw47yQ64YT_GZ74baXuOqSFdMhumgjjL2zKNO01P4HACW313a4eLpjEqSml2gFt1XR_StxU-wXCN6etMbGy-4rT88LZ9P5XqRhTexNwLZiY8r38N5mwakWrZYAfr2-jwW8eZ2AfIj8oI8iOqfhWmT-aSmpSGOnBcYqmo2rwhPM8PR-9ZSC3rRTbOhJJ0pkkB9JRGCRQa4dgIlIfbin7QIA4MzTqWsu7DikztaiDUqsnWF-MoUuaj1zuKAE-oT7Vg9fvRQbth-7N5WE6ZAlPlJE7LfCyAT6-2tsaCP_zK7s3X4eppj9Zzr-ZQFSOY_T2baoIV4R9-CisraA","provider": "google"}'
+curl -s -X POST http://localhost:8080/get_salt \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"eyJhbGciOiJSUzI1NiIsImtpZCI6IjA3ZjA3OGYyNjQ3ZThjZDAxOWM0MGRhOTU2OWU0ZjUyNDc5OTEwOTQiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI1NjA2MjkzNjU1MTctbXQ5ajlhcmZsY2dpMzVpOGhwb3B0cjY2cWdvMWxtZm0uYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI1NjA2MjkzNjU1MTctbXQ5ajlhcmZsY2dpMzVpOGhwb3B0cjY2cWdvMWxtZm0uYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTExNDA0NjE1MzAyNDYxNjQ1MjYiLCJub25jZSI6InlwanZ6TXB6d09qelcycUlrVnBiQU9UTUZuVSIsIm5iZiI6MTc1Nzc1MjA2NCwiaWF0IjoxNzU3NzUyMzY0LCJleHAiOjE3NTc3NTU5NjQsImp0aSI6ImZkYzRmNTc3YWI0NWViZjhiMjU3NjkwMjQwZmUzMTYyOGFkOGI4ZmMifQ.D4NVKogzU76ZGV5HsUDTOHRwSSG1I3lgG4bUEWAeMW8G-QDnXBNY6QDFmYnVEWWx5VlejyQhvmdtJrXF2eDOMKGeOwnFlm1INQuneELbLz0sbKnDw62IKshgQGNP5jv5ij-HEKj3jkx8D1zof83duVDhFOUmDud0VZKPODfBRLbqoTJKz0cp0RwZ5k-SiT_aSeL-y_FodYcCt5VtXIZfvgWj_NbcscqPaIBMvjJ9-wFx8yD-6C5dIQDVgyhZGtLzwxRLZMr6yotBuz_49BlKquuPA6TgNdUvMRu35QRYEQYPx3RigYtKw_8GGW-LVbmZTKSBOKu8QMEweR9CCaBHvg","provider":"test_google"}'
 ```
 > ⚠️ **Note**: The JWT used in the above example should return an error like `{"error":"JWT token has expired","status":"failed"}` because the JWT has a valid period, it may become expired. You can follow the process in [m2-docker-tutorial.md](m2-docker-tutorial.md) to generate a fresh, valid JWT and replace the `"message"` field in the request body to ensure a successful API call.
 
