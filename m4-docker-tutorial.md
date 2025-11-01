@@ -1,17 +1,13 @@
 # M4 Docker Tutorial: Running KZero Full Stack Locally
 
-A comprehensive guide for running the complete KZero stack locally using Docker, including all six essential components required for the full authentication and wallet workflow.
+A comprehensive guide for running the complete KZero stack locally using Docker, enabling you to experience the full end-to-end zkLogin authentication and wallet workflow.
 
 ## 1. Overview
 
-This tutorial provides step-by-step instructions for setting up and running the complete KZero ecosystem locally. The setup consists of six components working together:
+This tutorial provides step-by-step instructions for setting up and running the complete KZero ecosystem locally. The setup consists of two main parts:
 
-1. **POSTGRES_DB** - PostgreSQL database for storing authentication and user data
-2. **auth-server** - OAuth2 authentication server with zkLogin support (from kzero-service)
-3. **proof-server** - WebSocket proof generation task server (from kzero-service)
-4. **proof-worker** - Zero-knowledge proof generation worker (from kzero-service)
-5. **wallet** - KZero wallet application (from kzero-wallet)
-6. **example** - Example application demonstrating KZero integration (from kzero-wallet)
+1. **kzero-service** - Backend services including database, authentication, and proof generation
+2. **kzero-wallet** - Frontend wallet application and example implementation
 
 These components work together to provide a complete end-to-end zkLogin authentication flow, allowing users to authenticate with their Google accounts and interact with the blockchain through zero-knowledge proofs.
 
@@ -23,87 +19,35 @@ Before starting, ensure you have the following installed:
 - **pnpm** >= 10.17.1
 - **Docker** >= 20.10 and **Docker Compose** >= 2.0
 - **Git** for cloning repositories
-- **Google OAuth Client ID** - You need to register an OAuth application in Google Cloud Console and obtain a Client ID
+- **Google OAuth Client ID** - You need to register an OAuth application in Google Cloud Console and obtain a Client ID and Client Secret
 
-## 3. Step 1: Setting Up kzero-service
+## 3. Step 1: Starting kzero-service
+
+The kzero-service provides a ready-to-use Docker setup that allows you to start all backend services with a single command.
 
 ### 3.1 Clone the Repository
 
-First, clone the kzero-service repository from the `feature/auth-server` branch:
+Clone the kzero-service-docker repository:
 
 ```bash
-git clone https://github.com/kzero-xyz/kzero-service.git
-cd kzero-service
-git checkout feature/auth-server
+git clone https://github.com/kzero-xyz/kzero-service-docker.git
+cd kzero-service-docker
 ```
 
-### 3.2 Prepare Assets(Same as the `DOCKER.md` in `kzero-service/feature/auth-server`)
+### 3.2 Start All Services
 
-Download the ZK proof assets for the proof-worker. This step can be run before `pnpm install` as it doesn't require dependencies:
+Execute the startup script to automatically launch all required services:
 
 ```bash
-# From project root (no dependencies required)
-pnpm setup:proof-worker
+./start-services.sh
 ```
 
-This will download `zkLogin.zkey` (588MB) to `apps/proof-worker/assets/`.
+This script will automatically start the following services:
 
-> **Note**: This is a large file download. Ensure you have sufficient disk space and a stable internet connection.
-
-### 3.3 Configure Environment
-
-Copy the example environment files and configure them:
-
-```bash
-cp apps/auth-server/.env.example apps/auth-server/.env
-cp apps/proof-server/.env.example apps/proof-server/.env
-cp apps/proof-worker/.env.example apps/proof-worker/.env
-```
-
-#### Important Configuration Steps
-
-Edit `apps/auth-server/.env` and make the following critical configurations:
-
-1. **Set Google Client ID**: Replace the placeholder Google OAuth Client ID with your actual Client ID obtained from Google Cloud Console:
-   ```env
-    GOOGLE_CLIENT_ID=your-google-client-id
-    GOOGLE_CLIENT_SECRET=your-google-client-secret
-   ```
-
-2. **Set Frontend Origin**: Configure `FRONTEND_ORIGIN` to match the port where kzero-wallet will run. It's recommended to set this to port `5176`:
-   ```env
-   FRONTEND_ORIGIN=http://localhost:5176
-   ```
-
-> **⚠️ Important**: The `FRONTEND_ORIGIN` must match the port where the wallet will run (5176), otherwise CORS errors will occur during authentication.
-
-3. **Comment Out**: If you are running locally, make sure to keep the following line in `apps/auth-server/.env` commented out:
-    ```env
-    # SALT_SERVER_URL=
-    ```
-> Do not set any value for `SALT_SERVER_URL` unless you intend to connect to a remote Salt Server.
-
-
-
-### 3.4 Run Database Migration
-
-Before starting the services, run the database migrations to set up the PostgreSQL schema:
-
-```bash
-docker compose run --rm migrate
-```
-
-This will initialize the database schema required by the authentication services.
-
-### 3.5 Start Services
-
-Start all services in detached mode:
-
-```bash
-docker compose up -d auth-server
-docker compose up -d proof-server proof-worker
-```
-
+- **PostgreSQL** - Database server for storing application data
+- **auth-server** - OAuth2 authentication service with zkLogin support
+- **proof-server** - WebSocket-based proof task scheduler
+- **proof-worker** - Zero-knowledge proof generation worker
 
 #### Verify Services Are Running
 
@@ -113,11 +57,11 @@ Check that all services are up and running:
 docker compose ps
 ```
 
-You should see the following services running:
-- `POSTGRES_DB` (postgres)
-- `auth-server`
-- `proof-server`
-- `proof-worker`
+You should see all four services listed and running:
+- PostgreSQL
+- auth-server
+- proof-server
+- proof-worker
 
 #### Check Service Logs
 
@@ -133,13 +77,17 @@ docker compose logs -f proof-server
 docker compose logs -f proof-worker
 ```
 
-At this point, the four service components are running:
-- ✅ POSTGRES_DB
+> **Note**: The startup script handles all necessary configurations, including environment setup and database migrations. You may need to configure your Google OAuth Client ID in the environment files if required by your setup.
+
+At this point, the backend service components are running:
+- ✅ PostgreSQL
 - ✅ auth-server
 - ✅ proof-server
 - ✅ proof-worker
 
-## 4. Step 2: Setting Up kzero-wallet
+## 4. Step 2: Starting kzero-wallet
+
+The kzero-wallet provides the frontend application and example implementation for interacting with KZero.
 
 ### 4.1 Clone the Repository
 
@@ -167,13 +115,13 @@ pnpm build
 
 ### 4.3 Start the Example Application
 
-From the kzero-wallet root directory, start the example application on port 5175:
+From the kzero-wallet root directory, start the example application on port 5175 in one terminal window:
 
 ```bash
 pnpm dev:example --port 5175
 ```
 
-This will start the example application that demonstrates KZero integration. Keep this terminal window open and running.
+Keep this terminal window open and running. The example application demonstrates KZero integration and serves as the main user interface.
 
 ### 4.4 Start the Wallet Application
 
@@ -184,12 +132,12 @@ cd /path/to/kzero-wallet
 pnpm dev:wallet --port=5176
 ```
 
-This will start the wallet application that handles the authentication flow and wallet interactions.
+This will start the wallet application that handles the authentication flow and wallet interactions. Keep this terminal window open as well.
 
-> **⚠️ Important**: The wallet must run on port 5176 (or match the `FRONTEND_ORIGIN` configured in `auth-server/.env`), as this is what the auth-server expects for CORS validation.
+> **⚠️ Important**: The wallet must run on port 5176, as this is the expected port configured in the auth-server for CORS validation.
 
-At this point, all six components are running:
-- ✅ POSTGRES_DB
+At this point, all components are running:
+- ✅ PostgreSQL
 - ✅ auth-server
 - ✅ proof-server
 - ✅ proof-worker
@@ -207,7 +155,7 @@ Once all components are running, you can test the complete KZero authentication 
 
 2. **Experience the full workflow**:
    - The example application will guide you through the authentication process
-   - You'll authenticate with your Google account (using the Client ID you configured)
+   - You'll authenticate with your Google account (using the OAuth Client ID configured in the services)
    - The system will generate zero-knowledge proofs for authentication
    - You can interact with wallet functionality through the authenticated session
 
@@ -217,7 +165,7 @@ Once all components are running, you can test the complete KZero authentication 
 
 To ensure everything is working correctly, verify:
 
-- ✅ All Docker containers are running (`docker compose ps`)
+- ✅ All Docker containers are running (`docker compose ps` in kzero-service-docker directory)
 - ✅ auth-server is accessible (check logs for startup messages)
 - ✅ proof-server and proof-worker are running (check logs for WebSocket connections)
 - ✅ Wallet is running on `http://localhost:5176`
@@ -234,26 +182,45 @@ To ensure everything is working correctly, verify:
 **Problem**: Browser console shows CORS errors when trying to authenticate.
 
 **Solution**: 
-- Verify that `FRONTEND_ORIGIN` in `apps/auth-server/.env` matches the wallet port (should be `http://localhost:5176`)
-- Restart the auth-server after changing the environment: `docker compose restart auth-server`
+- Verify that the `FRONTEND_ORIGIN` in the auth-server configuration matches the wallet port (`http://localhost:5176`)
+- Check the auth-server logs for CORS-related messages
+- Restart the auth-server service if needed
 
 #### Database Connection Issues
 
 **Problem**: Services fail to connect to PostgreSQL.
 
 **Solution**:
-- Verify PostgreSQL container is running: `docker compose ps`
+- Verify PostgreSQL container is running: `docker compose ps` (in kzero-service-docker directory)
 - Check database logs: `docker compose logs postgres`
-- Ensure migrations ran successfully: `docker compose run --rm migrate`
+- Ensure the startup script completed successfully
 
 #### Proof Generation Failures
 
 **Problem**: Proof generation fails or times out.
 
 **Solution**:
-- Verify proof-worker assets are downloaded correctly (check `apps/proof-worker/assets/zkLogin.zkey` exists)
 - Check proof-worker logs: `docker compose logs -f proof-worker`
 - Ensure proof-server is running and accessible
+- Verify that all required assets are properly configured
+
+#### Port Conflicts
+
+**Problem**: Ports 5175 or 5176 are already in use.
+
+**Solution**:
+- Find the process using the port: `lsof -i :5175` or `lsof -i :5176`
+- Kill the process or change the ports in the startup commands
+- If changing ports, update the `FRONTEND_ORIGIN` configuration in auth-server accordingly
+
+#### Google OAuth Errors
+
+**Problem**: Google authentication fails with "invalid client" error.
+
+**Solution**:
+- Verify your Google Client ID and Client Secret are correctly configured
+- Ensure the OAuth redirect URI matches what's configured in Google Cloud Console
+- Check auth-server logs for detailed error messages
 
 ### Stopping Services
 
@@ -261,9 +228,67 @@ To stop all services:
 
 ```bash
 # Stop kzero-service Docker containers
-cd kzero-service
+cd kzero-service-docker
 docker compose down
 
 # Stop kzero-wallet applications
 # Press Ctrl+C in both terminal windows running wallet and example
 ```
+
+## 7. Architecture Overview
+
+The complete KZero stack works together as follows:
+
+```
+┌─────────────┐
+│   Browser   │
+│  (User)     │
+└──────┬──────┘
+       │
+       │ HTTP/WebSocket
+       │
+       v
+┌─────────────────────────────────────────┐
+│         Example App (5175)              │
+│         Wallet App (5176)                │
+└──────┬────────────────┬──────────────────┘
+       │                │
+       │ Auth Requests  │ Proof Requests
+       │                │
+       v                v
+┌──────────────┐  ┌──────────────────┐
+│ auth-server  │  │  proof-server    │
+│              │  │                  │
+└──────┬───────┘  └──────────┬───────┘
+       │                     │
+       │                     │ WebSocket
+       │                     │
+       v                     v
+┌──────────────┐      ┌──────────────┐
+│ PostgreSQL   │      │proof-worker  │
+│              │      │              │
+└──────────────┘      └──────────────┘
+```
+
+1. User interacts with the **Example App** (port 5175)
+2. **Wallet App** (port 5176) handles authentication requests
+3. **auth-server** processes OAuth authentication and manages sessions
+4. **proof-server** coordinates proof generation tasks
+5. **proof-worker** generates zero-knowledge proofs
+6. **PostgreSQL** stores authentication and user data
+
+## 8. Additional Resources
+
+For more detailed information and implementation details, please refer to the following KZero repositories:
+
+- **kzero-service**: [https://github.com/kzero-xyz/kzero-service](https://github.com/kzero-xyz/kzero-service) - Backend services including auth-server, proof-server, and proof-worker
+- **kzero-service-docker**: [https://github.com/kzero-xyz/kzero-service-docker](https://github.com/kzero-xyz/kzero-service-docker) - Docker setup for easy local deployment
+- **kzero-wallet**: [https://github.com/kzero-xyz/kzero-wallet](https://github.com/kzero-xyz/kzero-wallet) - Wallet SDK and example applications
+- **kzero**: [https://github.com/kzero-xyz/kzero](https://github.com/kzero-xyz/kzero) - Core KZero project repository
+- **kzero-salt-enclave-service**: [https://github.com/kzero-xyz/kzero-salt-enclave-service](https://github.com/kzero-xyz/kzero-salt-enclave-service) - Salt generation service with Intel SGX enclave support
+- **kzero-mvp-demo**: [https://github.com/kzero-xyz/kzero-mvp-demo](https://github.com/kzero-xyz/kzero-mvp-demo) - MVP demonstration and example implementations
+
+---
+
+**Note**: This tutorial is designed for local development and testing purposes. For production deployments, ensure proper security configurations, use production-grade credentials, and follow security best practices for OAuth and database configurations.
+
