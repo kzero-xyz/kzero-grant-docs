@@ -28,20 +28,11 @@ Fix: Add: `Testing Guide for KZero Wallet SDK`:  https://github.com/kzero-xyz/kz
 
 
 Fix: You can follow the docker tutorial to build and run the docker locally.
-- m4-docker-tutorial:
-https://github.com/kzero-xyz/kzero-grant-docs/blob/main/m4-docker-tutorial.md
+- m4-docker-tutorial: [https://github.com/kzero-xyz/kzero-grant-docs/blob/main/m4-docker-tutorial.md](https://github.com/kzero-xyz/kzero-grant-docs/blob/main/m4-docker-tutorial.md)
 
-The whole process includes 6 components working together:
-- POSTGRES_DB - PostgreSQL database for storing authentication and user data
-- auth-server - OAuth2 authentication server with zkLogin support (from kzero-service)
-- proof-server - WebSocket proof generation task server (from kzero-service)
-- proof-worker - Zero-knowledge proof generation worker (from kzero-service)
-- wallet - KZero wallet application (from kzero-wallet)
-- example - Example application demonstrating KZero integration (from kzero-wallet)
-
-> The whole process docker tutorial includes the following docker instruction related to kzero-service(at the [Part 3. Step 1: Setting Up kzero-service](https://github.com/kzero-xyz/kzero-grant-docs/blob/main/m4-docker-tutorial.md#3-step-1-setting-up-kzero-service) in the m4-docker-tutorial)
-> - For running kzero-service(running the first 4 components):
-> https://github.com/kzero-xyz/kzero-service/blob/feature/auth-server/DOCKER.md
+The local Docker setup consists of two parts:
+1. **Starting the pre-packaged kzero-service Docker**: Launch the ready-to-use Docker setup for kzero-service which includes PostgreSQL, auth-server, proof-server, and proof-worker. See [Step 1: Starting kzero-service] in the m4-docker-tutorial.
+2. **Starting kzero-wallet**: Launch the wallet application and example application locally. See [Step 2: Starting kzero-wallet] in the m4-docker-tutorial.
 
 ## 0e
 | Number | Deliverable | Accepted | Link | Evaluation Notes |
@@ -56,7 +47,7 @@ Fix: The document shows the overall arch of Kzero: https://github.com/kzero-xyz/
 | ------ | ----------- | -------- | ---- | ---------------- |
 | 1. | KZero-SDK | [ ] | https://github.com/kzero-xyz/kzero-wallet | Packages build, but the example wallet renders a blank page locally even after running `pnpm install && pnpm dev:wallet`; SDK functionality cannot be verified in isolation. |
 
-- Fix: follow the docker tutorial, at 0d, and run the command below open the kzero page.
+- Fix: follow the docker tutorial, at 0d, and run the command below open the kzero page at `localhost:5175`.
 
 ```bash
 pnpm dev:example --port 5175
