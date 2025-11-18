@@ -13,24 +13,16 @@ We use **Vitest** as our primary testing framework, which provides:
 - 🎯 **Jest-compatible API** for familiar testing patterns
 - 📊 **Built-in coverage reporting**
 - 🔄 **Watch mode** for development
+- 🌐 **Happy DOM environment** for browser API simulation
 
-### Configuration
 
-The testing configuration is defined in `vitest.config.ts`:
+### Test Structure
+Tests are organized using Vitest's describe and it blocks:
+- **describe** - Groups related test cases
+- **it** - Individual test cases
+- **beforeEach / afterEach** - Setup and teardown hooks
+- **vi** - Vitest's mocking utilities (e.g., vi.fn(), vi.spyOn(), vi.clearAllMocks())
 
-```typescript
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
-import tsconfigPaths from 'vite-tsconfig-paths';
-
-export default defineConfig({
-  plugins: [react(), tsconfigPaths()],
-  test: {
-    environment: 'node',
-    globals: true
-  }
-});
-```
 ## Running Tests
 
 ### Prerequisites
@@ -52,17 +44,20 @@ pnpm build
 # From root directory
 pnpm test
 
-# Or specifically for example-wallet
-pnpm --filter @kzero/example-wallet test
+# Or specifically for message-port
+pnpm --filter @kzero/message-port test
 ```
 
 #### Run Tests in Watch Mode
 ```bash
-# Watch mode for development
-pnpm test:watch
+# For specific package
+pnpm --filter @kzero/message-port test:watch
+```
 
-# Or for specific package
-pnpm --filter @kzero/example-wallet test:watch
+#### Run Tests with Coverage
+```bash
+# For getting the coverage report of tests
+pnpm test:cov
 ```
 
 #### Run Type Checking
@@ -76,100 +71,68 @@ pnpm check-types
 
 Our test suite provides comprehensive coverage across multiple dimensions:
 
+### Test Statistics
+
+The current test suite includes:
+
+| Package | Test Files | Tests | Status |
+|---------|------------|-------|--------|
+| `@kzero/zk-core` | 2 | 40 | ✅ All passing |
+| `@kzero/message-port` | 2 | 25 | ✅ All passing |
+| `@kzero/wallet` | 12 | 236 | ✅ All passing |
+| `@kzero/zk-react` | 7 | 99 | ✅ All passing |
+| **Total** | **23** | **400** | ✅ **100% passing** |
+
+All tests are passing successfully with comprehensive coverage across:
+- Core ZK functionality and proof generation
+- Message port communication and security
+- Wallet operations (account storage, authentication, encryption, session management)
+- React hooks and provider components
+
 ### Core Functionality Tests
 
-| Test Case | Purpose | Coverage |
-|-----------|---------|----------|
-| `should prepare call successfully` | Basic functionality | Return structure validation |
-| `should return correct structure` | Output validation | Complete response object |
+#### @kzero/zk-core Tests
 
-### ZK Authentication Tests
+| Test File | Test Cases | Coverage |
+|-----------|------------|----------|
+| `logger.test.ts` | 25 tests | Logger functionality, log levels, formatting |
+| `getProof.test.ts` | 15 tests | ZK proof generation, input validation, error handling |
 
-| Test Case | Purpose | Coverage |
-|-----------|---------|----------|
-| `should create JWK provider as Google` | Identity provider setup | Provider configuration |
-| `should create ZK inputs with correct structure` | ZK proof processing | Input data structure |
-| `should create ZK material with V1 structure` | ZK material generation | Versioned material format |
+#### @kzero/message-port Tests
 
-### Blockchain Interaction Tests
+| Test File | Test Cases | Coverage |
+|-----------|------------|----------|
+| `BidirectionalPort.test.ts` | 17 tests | Message port communication, cleanup on destroy |
+| `factory.test.ts` | 8 tests | Port factory functions, origin validation, security checks |
 
-| Test Case | Purpose | Coverage |
-|-----------|---------|----------|
-| `should create transaction with correct call` | Transaction creation | Call parameter validation |
-| `should query account nonce` | Account state query | Nonce retrieval |
-| `should sign transaction with correct parameters` | Transaction signing | Signature process |
+#### @kzero/wallet Tests
 
-### Data Processing Tests
+| Test File | Test Cases | Coverage |
+|-----------|------------|----------|
+| `accountStorage.test.ts` | 23 tests | Account storage, session management, data persistence |
+| `authService.test.ts` | 18 tests | Authentication flow, API integration, error handling |
+| `cardStore.test.ts` | 18 tests | Card data management and storage |
+| `proofPollingService.test.ts` | 14 tests | Proof polling mechanism, status tracking, error recovery |
+| `messageHandler.test.ts` | 17 tests | Message handling, request resolution/rejection |
+| `urlParams.test.ts` | 25 tests | URL parameter parsing, theme handling, validation |
+| `stateRestoration.test.ts` | 8 tests | Application state restoration and persistence |
+| `applyTheme.test.ts` | 7 tests | Theme application and customization |
+| `units.test.ts` | 28 tests | Unit conversion utilities and formatting |
+| `ephemeralKeyUtils.test.ts` | 7 tests | Ephemeral key generation and management |
+| `sessionManager.test.ts` | 48 tests | Session management, PIN encryption/decryption, keypair handling |
+| `encryptionUtils.test.ts` | 23 tests | Encryption/decryption with PIN, data security, error handling |
 
-| Test Case | Purpose | Coverage |
-|-----------|---------|----------|
-| `should handle BigInt conversion for proof values` | Number conversion | BigInt handling |
-| `should handle different proof point structures` | Data flexibility | Various input formats |
+#### @kzero/zk-react Tests
 
-## Mock Strategy
-
-Our testing approach uses comprehensive mocking to isolate the function under test:
-
-### Mocked Dependencies
-
-#### 1. ApiPromise Mock
-```typescript
-const mockApi = {
-  tx: mockTx,
-  registry: {
-    createType: mockRegistryCreateType
-  },
-  createType: mockCreateType,
-  query: {
-    system: {
-      account: mockQueryAccount
-    }
-  },
-  genesisHash: '0x1234',
-  runtimeVersion: { specVersion: 1 }
-} as unknown as ApiPromise;
-```
-
-#### 2. KeyringPair Mock
-```typescript
-const mockPair = {
-  address: '0x1234567890abcdef',
-  publicKey: new Uint8Array(32).fill(1),
-  secretKey: new Uint8Array(64).fill(2)
-} as unknown as KeyringPair;
-```
-
-#### 3. Proof Data Mock
-```typescript
-const mockProof = {
-  kid: 1,
-  proof: {
-    proof_points: {
-      a: ['1', '2', '3'],
-      b: [['1', '2'], ['3', '4'], ['5', '6']],
-      c: ['7', '8', '9']
-    },
-    iss_base64_details: {
-      value: '123456789',
-      index_mod_4: 0
-    },
-    header: '987654321'
-  },
-  maxEpoch: '1000',
-  zkAddress: '0xabcdef1234567890'
-};
-```
-
-### Mock Data Distinction
-
-We use distinct values for different purposes to ensure clarity:
-
-| Type | Value | Purpose |
-|------|-------|---------|
-| **genesisHash** | `0x1234` | Blockchain network identifier |
-| **address** | `0x1234567890abcdef` | User wallet address |
-| **method** | `0xabcd` | Transaction method call |
-| **zkAddress** | `0xabcdef1234567890` | ZK authentication address |
+| Test File | Test Cases | Coverage |
+|-----------|------------|----------|
+| `errors.test.ts` | 4 tests | Error types and error handling |
+| `helpers.test.ts` | 10 tests | Utility helper functions |
+| `providersSerializer.test.ts` | 10 tests | Provider data serialization |
+| `themeSerializer.test.ts` | 11 tests | Theme data serialization |
+| `authWindow.test.ts` | 16 tests | Authentication window management |
+| `WalletConnection.test.ts` | 26 tests | Wallet connection provider, auth flow |
+| `useKzero.test.tsx` | 22 tests | React hooks for wallet integration |
 
 
 ## Support
